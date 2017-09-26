@@ -1,0 +1,5 @@
+#ignore debug folder
+/Debug
+#ignore visual studio project file
+*.sdf
+*.opensdf
