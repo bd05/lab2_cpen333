@@ -4,7 +4,7 @@
 
 // count number of hits using nsamples, populates hits[idx]
 void pi_hits(std::vector<int>& hits, int idx, int nsamples) {
-
+	std::cout << "idx starts at: " << idx << std::endl;
 	// single instance of random engine and distribution
 	static std::default_random_engine rnd;
 	static std::uniform_real_distribution<double> dist(-1.0, 1.0);
@@ -20,9 +20,13 @@ void pi_hits(std::vector<int>& hits, int idx, int nsamples) {
 		y = dist(rnd);
 		distanceFromOrigin = sqrt(pow(x, 2) + pow(y, 2));
 		if (distanceFromOrigin <= 1){
-			hits[idx] = true;
+			hits[idx] += 1;
 		}
-	}	
+	}
+	/*std::cout << "hits in individual thread" << std::endl;
+	for (int i = 0; i < hits.size(); ++i) {
+		std::cout << "hits " << i << " " << hits[i] << std::endl;
+	}*/
 }
 
 // divides work among threads intelligently
@@ -54,6 +58,7 @@ double estimate_pi_multithread(int nsamples) {
 	// estimate pi
 	double pi = 0;
 	for (int i = 0; i<nthreads; ++i) {
+		std::cout << "hits " << i << " " << hits[i] << std::endl;
 		pi += hits[i];
 	}
 	pi = pi / nsamples * 4;
@@ -147,7 +152,7 @@ int main() {
 	double pi2 = estimate_pi_multithread_naive(1000);
 	std::cout << "My second estimate of PI is: " << pi << std::endl;
 
-	double pi3 = estimate_pi_multithread(1000);
+	double pi3 = estimate_pi_multithread(100);
 	std::cout << "My third estimate of PI is: " << pi << std::endl;
 
 	return 0;

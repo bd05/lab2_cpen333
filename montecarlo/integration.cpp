@@ -81,8 +81,93 @@ public:
 	}
 };
 
-int main() {
+// count number of hits using nsamples, populates hits[idx]
+void circle_hits(std::vector<double>& hits, std::vector<double>& hits_x, std::vector<double>& hits_y, std::vector<double>& hits_z, int idx, int nsamples) {
+
+	// single instance of random engine and distribution
 	static std::default_random_engine rnd;
+	static std::uniform_real_distribution<double> dist(-1.0, 1.0);
+	double x;
+	double y;
+	double z;
+	double distanceFromOrigin;
+	Density3 d1;
+	XFunction xd1(d1);  // x*d1(x,y,z)
+	YFunction yd1(d1);  // y*d1(x,y,z)
+	ZFunction zd1(d1);  // z*d1(x,y,z)
+
+	for (int i = 0; i < nsamples; ++i) {
+		x = dist(rnd);
+		y = dist(rnd);
+		z = dist(rnd);
+		distanceFromOrigin = sqrt(pow(x, 2) + pow(y, 2) + pow(z, 2));
+		if (distanceFromOrigin <= 1){
+			hits[idx] += d1.eval(x, y, z);
+			hits_x[idx] += xd1.eval(x, y, z);
+			hits_y[idx] += yd1.eval(x, y, z);
+			hits_z[idx] += zd1.eval(x, y, z);
+		}
+	}
+}
+
+
+double estimate_p_multithread(int nsamples) {
+	// number of available cores
+	int nthreads = std::thread::hardware_concurrency();
+	std::cout << "nthreads available: " << nthreads << std::endl;
+	double p = 0;
+	double px = 0;
+	double py = 0;
+	double pz = 0;
+	double cx = 0;
+	double cy = 0;
+	double cz = 0;
+
+	// hit counts
+	std::vector<double> hits(nthreads, 0);
+	std::vector<double> hits_x(nthreads, 0);
+	std::vector<double> hits_y(nthreads, 0);
+	std::vector<double> hits_z(nthreads, 0);
+
+	// create and store threads
+	std::vector<std::thread> threads;
+	int msamples = 0; // samples accounted for
+	for (int i = 0; i<nthreads - 1; ++i) {
+		threads.push_back(
+			std::thread(circle_hits, std::ref(hits), std::ref(hits_x), std::ref(hits_y), std::ref(hits_z), i, nsamples / nthreads));
+		msamples += nsamples / nthreads;
+	}
+	// remaining samples
+	threads.push_back(
+		std::thread(circle_hits, std::ref(hits), std::ref(hits_x), std::ref(hits_y), std::ref(hits_z), nthreads - 1, nsamples - msamples));
+
+	// wait for threads to finish
+	for (int i = 0; i<nthreads; ++i) {
+		threads[i].join();
+	}
+
+	// estimate centre of mass
+	for (int i = 0; i < nthreads; ++i) {
+		p += hits[i];
+		px += hits_x[i];
+		py += hits_y[i];
+		pz += hits_z[i];
+	}
+
+	cx = px / p;
+	cy = py / p;
+	cz = pz / p;
+
+	std::cout << "cx: " << cx << std::endl;
+	std::cout << "cy: " << cy << std::endl;
+	std::cout << "cz: " << cz << std::endl;
+
+	return p;
+}
+
+
+int main() {
+	/*static std::default_random_engine rnd;
 	static std::uniform_real_distribution<double> dist(-1.0, 1.0);
 	double x, y, z;
 	double pIntegral = 0;
@@ -105,6 +190,7 @@ int main() {
 		z = dist(rnd);
 
 		if (sqrt(pow(x, 2) + pow(y, 2) + pow(z, 2)) <= 1){
+			//turn the cumulative sums eval()'s into threads
 			pIntegral += d1.eval(x, y, z);
 			px += xd1.eval(x, y, z);
 			py += yd1.eval(x, y, z);
@@ -116,16 +202,16 @@ int main() {
 	cx = px / pIntegral;
 	cy = py / pIntegral;
 	cz = pz / pIntegral;
-
+	
 	std::cout << "cx: " << cx << std::endl;
 	std::cout << "cy: " << cy << std::endl;
 	std::cout << "cz: " << cz << std::endl;
+	*/
 
-
-	/*std::cout << "d1.eval(0.1,0.2,0.3): " << d1.eval(0.1, 0.2, 0.3) << std::endl;
-	std::cout << "xd1.eval(0.1,0.2,0.3): " << xd1.eval(0.1, 0.2, 0.3) << std::endl;
-	std::cout << "yd1.eval(0.1,0.2,0.3): " << yd1.eval(0.1, 0.2, 0.3) << std::endl;
-	std::cout << "zd1.eval(0.1,0.2,0.3): " << zd1.eval(0.1, 0.2, 0.3) << std::endl;*/
+	estimate_p_multithread(1000);
+	estimate_p_multithread(10000);
+	estimate_p_multithread(100000);
+	estimate_p_multithread(1000000);
 
 	return 0;
 }
